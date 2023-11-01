@@ -1,0 +1,5 @@
+-i https://pypi.org/simple
+pyside6==6.6.0; python_version < '3.13' and python_version >= '3.8'
+pyside6-addons==6.6.0; python_version < '3.13' and python_version >= '3.8'
+pyside6-essentials==6.6.0; python_version < '3.13' and python_version >= '3.8'
+shiboken6==6.6.0; python_version < '3.13' and python_version >= '3.8'
