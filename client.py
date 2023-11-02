@@ -135,6 +135,12 @@ class FtpClient(object):
 
         return data
 
+    def logout(self):
+        self._is_connected()
+        self._is_authenticated()
+        self._log(f'logging out {Fore.YELLOW}{self.user}{Style.RESET_ALL}')
+        self.user = None
+
     def _send_command(self, command: str, *args: str):
         for arg in args:
             command += f' {arg}'
@@ -160,4 +166,5 @@ class FtpClient(object):
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
+client.logout()
 client.disconnect()
