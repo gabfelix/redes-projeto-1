@@ -56,11 +56,9 @@ class FtpClient(object):
         def __str__(self):
             return(repr(self.message))
 
-
     PORT = 21
     SOCKET_TIMEOUT = 5 # in seconds
     SOCKET_RCV_BYTES = 4096
-
 
     def __init__(self, debug: bool = False):
         self._debug = debug
@@ -113,7 +111,6 @@ class FtpClient(object):
         self._reset_sockets()
 
         return data
-
 
     def _send_command(self, command: str, *args: str):
         for arg in args:
