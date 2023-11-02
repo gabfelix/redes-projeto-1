@@ -43,6 +43,13 @@ class FtpClient(object):
 
         def __str__(self):
             return(repr(self.message))
+    
+    class NotAuthenticated(Exception):
+        def __init__(self):
+            self.message = "Not authenticated"
+
+        def __str__(self):
+            return(repr(self.message))
 
     class ConnectionRefused(Exception):
         def __init__(self):
@@ -107,7 +114,7 @@ class FtpClient(object):
         return self._receive_command_data()
 
     def disconnect(self):
-        self._check_connection()
+        self._is_connected()
         self._send_command(FtpClient.Command.QUIT)
         data = self._receive_command_data()
         self._reset_sockets()
@@ -115,7 +122,7 @@ class FtpClient(object):
         return data
 
     def login(self, user, password):
-        self._check_connection()
+        self._is_connected()
         self._send_command(FtpClient.Command.USER, user)
         _ = self._receive_command_data()
         self._send_command(FtpClient.Command.PASS, password)
@@ -142,9 +149,13 @@ class FtpClient(object):
         self._log(f'received command data - {Fore.BLUE}{data}{Style.RESET_ALL}')
         return data
 
-    def _check_connection(self):
+    def _is_connected(self):
         if self.host is None:
             raise FtpClient.NotConnected
+
+    def _is_authenticated(self):
+        if self.user is None:
+            raise FtpClient.NotAuthenticated
 
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
