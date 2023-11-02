@@ -2,7 +2,7 @@
 
 import socket
 import errno
-import colorama
+from colorama import Fore, Style
 from enum import Enum
 
 class FtpClient(object):
@@ -35,20 +35,41 @@ class FtpClient(object):
         def __str__(self):
             return(repr(self.message))
 
+    class NotConnected(Exception):
+        def __init__(self):
+            self.message = "Not connected"
+
+        def __str__(self):
+            return(repr(self.message))
+
     class ConnectionRefused(Exception):
         def __init__(self):
             self.message = "Connection refused"
 
         def __str__(self):
             return(repr(self.message))
+    
+    class SocketTimeout(Exception):
+        def __init__(self):
+            self.message = "A socket has timed out"
+
+        def __str__(self):
+            return(repr(self.message))
+
 
     PORT = 21
     SOCKET_TIMEOUT = 5 # in seconds
     SOCKET_RCV_BYTES = 4096
 
 
-    def __init__(self):
+    def __init__(self, debug: bool = False):
+        self._debug = debug
         self._reset_sockets()
+
+    def _log(self, msg: str):
+        msg = f'{Fore.GREEN}[DEBUG]{Style.RESET_ALL} {msg}'
+        if self._debug:
+           print(msg) 
 
     def _reset_sockets(self):
         self._reset_command_socket()
@@ -85,13 +106,33 @@ class FtpClient(object):
 
         return self._receive_command_data()
 
-    def _receive_command_data(self):
-        data = self._command_socket.recv(FtpClient.SOCKET_RCV_BYTES)
-        print(f'received command data - {data}')
+    def disconnect(self):
+        self._check_connection()
+        self._send_command(FtpClient.Command.QUIT)
+        data = self._receive_command_data()
+        self._reset_sockets()
+
         return data
 
-client = FtpClient()
+
+    def _send_command(self, command: str, *args: str):
+        for arg in args:
+            command = f'{command} {arg}'
+        try:
+            self._log(f'sending command: {Fore.YELLOW}{command}{Style.RESET_ALL}')
+            self._command_socket.sendall(str.encode(f'{command}\r\n'))
+        except socket.timeout:
+            raise FtpClient.SocketTimeout
+
+    def _receive_command_data(self):
+        data = self._command_socket.recv(FtpClient.SOCKET_RCV_BYTES)
+        self._log(f'received command data - {Fore.BLUE}{data}{Style.RESET_ALL}')
+        return data
+
+    def _check_connection(self):
+        if self.host is None:
+            raise FtpClient.NotConnected
+
+client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
-if client.host is None:
-    print('Connection failed')
-client._reset_sockets()
+client.disconnect()
