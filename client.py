@@ -11,6 +11,7 @@ class FtpClient(object):
         USER = 'USER'
         PASS = 'PASS'
         EPRT = 'EPRT'
+        EPSV = 'EPSV'
         QUIT = 'QUIT'
         RETR = 'RETR'
         STOR = 'STOR'
@@ -90,11 +91,30 @@ class FtpClient(object):
         self._command_socket = socket.socket()
         self._command_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
 
+    def _open_data_connection(self):
+        self._is_connected()
+        self._is_authenticated()
+
+        self._send_command(FtpClient.Command.EPSV)
+        data = self._receive_command_data()
+        self._data_port = int(data.decode("utf-8").split("|")[3])
+
+        try:
+            self._data_socket.connect((self.host, self._data_port))
+        except socket.gaierror:
+            self._reset_sockets()
+            raise FtpClient.UnknownHost
+        except socket.error as e:
+            if e.errno == errno.ECONNREFUSED:
+                raise FtpClient.ConnectionRefused
+
+        self._log(f'passive connection established at {Fore.CYAN}{self.host}{Style.RESET_ALL}:{Fore.MAGENTA}{self._data_port}{Style.RESET_ALL}')
+        self._data_socket_is_connected = True
+        
     def _reset_data_socket(self):
-        if getattr(self, '_data_socket_listening', False):
-            self._data_socket.close()
         self._data_socket = socket.socket()
-        self._data_socket_listening = False
+        self._data_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
+        self._data_socket_is_connected = False
 
     def connect(self, host=None):
         if self.host is not None:
@@ -166,5 +186,6 @@ class FtpClient(object):
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
+client._open_data_connection()
 client.logout()
 client.disconnect()
