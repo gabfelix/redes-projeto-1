@@ -110,10 +110,40 @@ class FtpClient(object):
 
         self._log(f'passive connection established at {Fore.CYAN}{self.host}{Style.RESET_ALL}:{Fore.MAGENTA}{self._data_port}{Style.RESET_ALL}')
         self._data_socket_is_connected = True
+
+    def _read_from_data_connection(self):
+        total_data = ''
+        while True:
+            data = self._data_socket.recv(FtpClient.SOCKET_RCV_BYTES)
+            total_data += data.decode("utf-8")
+            if not data:
+                break
+        # self._data_socket.close()
+        self._log(f'received data - {total_data}')
+        return total_data
+
+    def list(self, filename=None):
+        self._is_connected()
+        self._is_authenticated()
+
+        if filename is not None:
+            self._send_command(FtpClient.Command.LIST, filename)
+        else:
+            self._send_command(FtpClient.Command.LIST)
+
+        data = self._receive_command_data()
+
+        if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
+            list_data = self._read_from_data_connection().replace('\\r\\n', '\n')
+            print(list_data)
+            data += list_data.encode() + self._receive_command_data()
+
+        return data
         
     def _reset_data_socket(self):
         self._data_socket = socket.socket()
         self._data_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
+
         self._data_socket_is_connected = False
 
     def connect(self, host=None):
@@ -187,5 +217,6 @@ client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client._open_data_connection()
+client.list()
 client.logout()
 client.disconnect()
