@@ -23,10 +23,12 @@ class FtpClient(object):
         RNFR = 'RNFR'
         RNTO = 'RNTO'
 
+    # More on these codes at:
+    # https://en.wikipedia.org/wiki/List_of_FTP_server_return_codes
     class Status():
-        STATUS_230 = '230'
-        STATUS_550 = '550'
-        STATUS_530 = '530'
+        LOGIN_SUCCESS = str.encode('230')
+        LOGIN_FAIL = str.encode('530')
+        FILE_NOT_FOUND = str.encode('550')
 
     class UnknownHost(Exception):
         def __init__(self):
@@ -112,9 +114,23 @@ class FtpClient(object):
 
         return data
 
+    def login(self, user, password):
+        self._check_connection()
+        self._send_command(FtpClient.Command.USER, user)
+        _ = self._receive_command_data()
+        self._send_command(FtpClient.Command.PASS, password)
+        data = self._receive_command_data()
+
+        if data.startswith(FtpClient.Status.LOGIN_SUCCESS):
+            self.user = user
+        elif data.startswith(FtpClient.Status.LOGIN_FAIL):
+            self.user = None
+
+        return data
+
     def _send_command(self, command: str, *args: str):
         for arg in args:
-            command = f'{command} {arg}'
+            command += f' {arg}'
         try:
             self._log(f'sending command: {Fore.YELLOW}{command}{Style.RESET_ALL}')
             self._command_socket.sendall(str.encode(f'{command}\r\n'))
@@ -132,4 +148,5 @@ class FtpClient(object):
 
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
+client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client.disconnect()
