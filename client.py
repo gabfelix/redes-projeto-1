@@ -29,8 +29,18 @@ class FtpClient(object):
         STATUS_530 = '530'
 
     class UnknownHost(Exception):
-        f'Connection failed. Host unreachable.'
-        pass
+        def __init__(self):
+            self.message = "Host not found"
+
+        def __str__(self):
+            return(repr(self.message))
+
+    class ConnectionRefused(Exception):
+        def __init__(self):
+            self.message = "Connection refused"
+
+        def __str__(self):
+            return(repr(self.message))
 
     PORT = 21
     SOCKET_TIMEOUT = 5 # in seconds
@@ -71,7 +81,7 @@ class FtpClient(object):
             raise FtpClient.UnknownHost
         except socket.error as e:
             if e.errno == errno.ECONNREFUSED:
-                exit(1)
+                raise FtpClient.ConnectionRefused
 
         return self._receive_command_data()
 
