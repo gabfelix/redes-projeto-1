@@ -1,12 +1,40 @@
 #!/usr/bin/python3
 
+"""
+This module contains the implementation of an FTP client using Python's socket library.
+It provides a class FtpClient that represents an FTP client and has methods to connect
+to an FTP server, login, logout, list files in the current directory or a specific file,
+and disconnect from the server.
+It also defines several custom exceptions that can be raised during the execution of the client.
+The client uses the colorama library to print debug messages in color.
+"""
+
 import socket
 import errno
 from colorama import Fore, Style
-from enum import Enum
 
-class FtpClient(object):
+
+class FtpClient:
+    """
+    A class representing an FTP client.
+
+    Attributes:
+    - PORT: int - the default port for FTP connections
+    - SOCKET_TIMEOUT: int - the timeout for socket connections in seconds
+    - SOCKET_RCV_BYTES: int - the number of bytes to receive from a socket at a time
+
+    Methods:
+    - __init__(self, debug: bool = False) - initializes a new FtpClient instance
+    - connect(self, host=None) - connects to an FTP server
+    - disconnect(self) - disconnects from the FTP server
+    - login(self, user, password) - logs in to the FTP server
+    - logout(self) - logs out from the FTP server
+    - list(self, filename=None) - lists the files in the current directory or a specific file
+    """
     class Command():
+        """
+        A class that defines FTP commands as constants.
+        """
         LIST = 'LIST'
         USER = 'USER'
         PASS = 'PASS'
@@ -27,57 +55,82 @@ class FtpClient(object):
     # More on these codes at:
     # https://en.wikipedia.org/wiki/List_of_FTP_server_return_codes
     class Status():
+        """
+        A class that defines the status codes used in the FTP client.
+        """
         LOGIN_SUCCESS = str.encode('230')
         LOGIN_FAIL = str.encode('530')
         FILE_NOT_FOUND = str.encode('550')
 
     class UnknownHost(Exception):
+        """Exception raised when a host is not found."""
+
         def __init__(self):
             self.message = "Host not found"
 
         def __str__(self):
-            return(repr(self.message))
+            return repr(self.message)
 
     class NotConnected(Exception):
+        """
+        Exception raised when attempting to perform an operation that requires a connection,
+        but the client is not currently connected to a server.
+        """
+
         def __init__(self):
             self.message = "Not connected"
 
         def __str__(self):
-            return(repr(self.message))
-    
+            return repr(self.message)
+
     class NotAuthenticated(Exception):
+        """
+        Exception raised when a user is not authenticated.
+        """
+
         def __init__(self):
             self.message = "Not authenticated"
 
         def __str__(self):
-            return(repr(self.message))
+            return repr(self.message)
 
     class ConnectionRefused(Exception):
+        """Exception raised when a connection is refused by the server."""
+
         def __init__(self):
             self.message = "Connection refused"
 
         def __str__(self):
-            return(repr(self.message))
-    
+            return repr(self.message)
+
     class SocketTimeout(Exception):
+        """Exception raised when a socket times out."""
+
         def __init__(self):
             self.message = "A socket has timed out"
 
         def __str__(self):
-            return(repr(self.message))
+            return repr(self.message)
 
     PORT = 21
-    SOCKET_TIMEOUT = 5 # in seconds
+    SOCKET_TIMEOUT = 5  # in seconds
     SOCKET_RCV_BYTES = 4096
 
     def __init__(self, debug: bool = False):
         self._debug = debug
+        self._command_socket = None
+        self._data_socket = None
+        self._data_port = None
+        self._data_socket_is_connected = False
+
+        self.host = None
+        self.user = None
         self._reset_sockets()
 
     def _log(self, msg: str):
         msg = f'{Fore.GREEN}[DEBUG]{Style.RESET_ALL} {msg}'
         if self._debug:
-           print(msg) 
+            print(msg)
 
     def _reset_sockets(self):
         self._reset_command_socket()
@@ -101,14 +154,15 @@ class FtpClient(object):
 
         try:
             self._data_socket.connect((self.host, self._data_port))
-        except socket.gaierror:
+        except socket.gaierror as e:
             self._reset_sockets()
-            raise FtpClient.UnknownHost
+            raise FtpClient.UnknownHost from e
         except socket.error as e:
             if e.errno == errno.ECONNREFUSED:
-                raise FtpClient.ConnectionRefused
+                raise FtpClient.ConnectionRefused from e
 
-        self._log(f'passive connection established at {Fore.CYAN}{self.host}{Style.RESET_ALL}:{Fore.MAGENTA}{self._data_port}{Style.RESET_ALL}')
+        self._log(f'passive connection established at {Fore.CYAN}{self.host}{Style.RESET_ALL}:'
+          f'{Fore.MAGENTA}{self._data_port}{Style.RESET_ALL}')
         self._data_socket_is_connected = True
 
     def _read_from_data_connection(self):
@@ -123,6 +177,19 @@ class FtpClient(object):
         return total_data
 
     def list(self, filename=None):
+        """
+        Sends a LIST command to the server to retrieve a list of files
+        in the current or specified directory.
+
+        Args:
+            filename (str, optional): The name of the directory to list.
+            If not specified, the current directory is listed.
+
+        Returns:
+            str: The response from the server, including the list of files
+            in the specified directory (if any).
+        """
+
         self._is_connected()
         self._is_authenticated()
 
@@ -135,11 +202,10 @@ class FtpClient(object):
 
         if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
             list_data = self._read_from_data_connection().replace('\\r\\n', '\n')
-            print(list_data)
             data += list_data.encode() + self._receive_command_data()
 
         return data
-        
+
     def _reset_data_socket(self):
         self._data_socket = socket.socket()
         self._data_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
@@ -147,23 +213,42 @@ class FtpClient(object):
         self._data_socket_is_connected = False
 
     def connect(self, host=None):
+        """
+        Connect to the FTP server at the specified host.
+
+        If a connection is already established, it will be reset before attempting to connect again.
+
+        Args:
+            host (str): The hostname or IP address of the FTP server to connect to.
+
+        Raises:
+            UnknownHost: If the specified host cannot be resolved to an IP address.
+            ConnectionRefused: If the FTP server is not accepting connections.
+        """
+
         if self.host is not None:
             self._reset_sockets()
-
-         # FIXME: Handle errors correctly
+        # FIXME: Handle errors correctly
         try:
             self._command_socket.connect((host, FtpClient.PORT))
             self.host = host
-        except socket.gaierror:
+        except socket.gaierror as e:
             self._reset_sockets()
-            raise FtpClient.UnknownHost
+            raise FtpClient.UnknownHost from e
         except socket.error as e:
             if e.errno == errno.ECONNREFUSED:
-                raise FtpClient.ConnectionRefused
+                raise FtpClient.ConnectionRefused from e
 
         return self._receive_command_data()
 
     def disconnect(self):
+        """
+        Disconnects from the FTP server by sending the QUIT command and resetting sockets.
+
+        Returns:
+            The response data received from the server after sending the QUIT command.
+        """
+
         self._is_connected()
         self._send_command(FtpClient.Command.QUIT)
         data = self._receive_command_data()
@@ -172,6 +257,16 @@ class FtpClient(object):
         return data
 
     def login(self, user, password):
+        """
+        Logs in to the FTP server with the given username and password.
+
+        Args:
+            user (str): The username to use for login.
+            password (str): The password to use for login.
+
+        Returns:
+            str: The response message from the server after attempting to login.
+        """
         self._is_connected()
         self._send_command(FtpClient.Command.USER, user)
         _ = self._receive_command_data()
@@ -186,6 +281,11 @@ class FtpClient(object):
         return data
 
     def logout(self):
+        """
+        Logs out the current user by setting the `user` attribute to `None`.
+        Raises an exception if the client is not connected or authenticated.
+        """
+
         self._is_connected()
         self._is_authenticated()
         self._log(f'logging out {Fore.YELLOW}{self.user}{Style.RESET_ALL}')
@@ -195,14 +295,16 @@ class FtpClient(object):
         for arg in args:
             command += f' {arg}'
         try:
-            self._log(f'sending command: {Fore.YELLOW}{command}{Style.RESET_ALL}')
+            self._log(
+                f'sending command: {Fore.YELLOW}{command}{Style.RESET_ALL}')
             self._command_socket.sendall(str.encode(f'{command}\r\n'))
-        except socket.timeout:
-            raise FtpClient.SocketTimeout
+        except socket.timeout as e:
+            raise FtpClient.SocketTimeout from e
 
     def _receive_command_data(self):
         data = self._command_socket.recv(FtpClient.SOCKET_RCV_BYTES)
-        self._log(f'received command data - {Fore.BLUE}{data}{Style.RESET_ALL}')
+        self._log(
+            f'received command data - {Fore.BLUE}{data}{Style.RESET_ALL}')
         return data
 
     def _is_connected(self):
@@ -212,6 +314,7 @@ class FtpClient(object):
     def _is_authenticated(self):
         if self.user is None:
             raise FtpClient.NotAuthenticated
+
 
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
