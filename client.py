@@ -284,6 +284,18 @@ class FtpClient:
 
         return data
 
+    def mkd(self, directory):
+        """
+        Send MKD command to host.
+        """
+        self._is_connected()
+        self._is_authenticated()
+
+        self._send_command(FtpClient.Command.MKD, directory)
+        data = self._receive_command_data()
+
+        return data
+
     def _reset_data_socket(self):
         self._data_socket = socket.socket()
         self._data_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
@@ -447,6 +459,6 @@ client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client.list()
-client.store('testfile.txt')
+client.mkd('test_dir')
 client.list()
 client.disconnect()
