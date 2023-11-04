@@ -203,9 +203,14 @@ class FtpClient:
             total_data += data
             if not data:
                 break
-        # self._data_socket.close()
         self._log(f'received data - {total_data}')
         return total_data
+
+    def _write_to_data_connection(self, data):
+        # TODO: Check if data connection is opened
+        self._log(f'sending data - {data}')
+        self._data_socket.sendall(data)
+        self._data_socket.close()
 
     def list(self, filename=None):
         """
@@ -390,6 +395,29 @@ class FtpClient:
                 except IOError as e:
                     raise FtpClient.LocalIOError from e
 
+    def store(self, local_filename, filename=None):
+        """
+        Stores the specified file on the server.
+
+        Note that local_filename and filename's order is reversed from the RETR command.
+        """
+        self._is_connected()
+        self._is_authenticated()
+
+        if filename is None:
+            filename = local_filename
+
+        with self._data_connection():
+            try:
+                with open(local_filename, 'rb') as local_file:
+                    file_data = bytearray(local_file.read())
+                    self._send_command(FtpClient.Command.STOR, filename)
+                    _ = self._receive_command_data()
+                    self._write_to_data_connection(file_data)
+                    _ = self._receive_command_data()
+            except IOError as e:
+                raise FtpClient.LocalIOError from e
+
     def _send_command(self, command: str, *args: str):
         for arg in args:
             command += f' {arg}'
@@ -419,8 +447,6 @@ client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client.list()
-client.cwd('input')
-client.list()
-client.cdup()
+client.store('testfile.txt')
 client.list()
 client.disconnect()
