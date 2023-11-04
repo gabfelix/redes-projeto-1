@@ -296,6 +296,42 @@ class FtpClient:
 
         return data
 
+    def dele(self, filename):
+        """
+        Send DELE command to host.
+        """
+        self._is_connected()
+        self._is_authenticated()
+
+        self._send_command(FtpClient.Command.DELE, filename)
+        data = self._receive_command_data()
+
+        return data
+
+    def rm(self, filename):
+        """
+        An alias for dele().
+        """
+        self.dele(filename)
+
+    def rmd(self, directory):
+        """
+        Send RMD command to host.
+        """
+        self._is_connected()
+        self._is_authenticated()
+
+        self._send_command(FtpClient.Command.RMD, directory)
+        data = self._receive_command_data()
+
+        return data
+
+    def rmdir(self, directory):
+        """
+        An alias for rmd().
+        """
+        self.rmd(directory)
+
     def _reset_data_socket(self):
         self._data_socket = socket.socket()
         self._data_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
@@ -458,7 +494,5 @@ class FtpClient:
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
-client.list()
-client.mkd('test_dir')
 client.list()
 client.disconnect()
