@@ -241,6 +241,20 @@ class FtpClient:
 
         return data
 
+    def pwd(self):
+        """
+        Sends a PWD command to the server to retrieve the current directory.
+        """
+        self._is_connected()
+        self._is_authenticated()
+
+        with self._data_connection():
+            self._send_command(FtpClient.Command.PWD)
+            data = self._receive_command_data().decode("utf-8")
+            data = data.split('\"')[1]
+
+        return data
+
     def _reset_data_socket(self):
         self._data_socket = socket.socket()
         self._data_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
@@ -381,5 +395,6 @@ client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client.list()
-client.retrieve('TestUpload.kml')
+client.pwd()
+client.retrieve('test.zip')
 client.disconnect()
