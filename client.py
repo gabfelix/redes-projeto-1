@@ -257,18 +257,24 @@ class FtpClient:
 
     def cwd(self, directory):
         """
-        Perform CWD command on connected host.
-
-        Args:
-            directory (str): Name of directory to work on.
-
-        Returns:
-            Message from host.
+        Send CWD command to host.
         """
         self._is_connected()
         self._is_authenticated()
 
         self._send_command(FtpClient.Command.CWD, directory)
+        data = self._receive_command_data()
+
+        return data
+
+    def cdup(self):
+        """
+        Send CDUP command to host.
+        """
+        self._is_connected()
+        self._is_authenticated()
+
+        self._send_command(FtpClient.Command.CDUP)
         data = self._receive_command_data()
 
         return data
@@ -414,7 +420,7 @@ client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client.list()
 client.cwd('input')
-client.pwd()
 client.list()
-client.retrieve('archive_csv.zip')
+client.cdup()
+client.list()
 client.disconnect()
