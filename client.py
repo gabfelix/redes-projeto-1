@@ -19,18 +19,22 @@ class FtpClient:
     """
     A class representing an FTP client.
 
-    Attributes:
-    - PORT: int - the default port for FTP connections
-    - SOCKET_TIMEOUT: int - the timeout for socket connections in seconds
-    - SOCKET_RCV_BYTES: int - the number of bytes to receive from a socket at a time
-
-    Methods:
-    - __init__(self, debug: bool = False) - initializes a new FtpClient instance
-    - connect(self, host=None) - connects to an FTP server
-    - disconnect(self) - disconnects from the FTP server
-    - login(self, user, password) - logs in to the FTP server
-    - logout(self) - logs out from the FTP server
-    - list(self, filename=None) - lists the files in the current directory or a specific file
+    Implemented commands:
+    - LIST
+    - USER
+    - PASS
+    - EPSV
+    - QUIT
+    - RETR
+    - STOR
+    - PWD
+    - CWD
+    - CDUP
+    - MKD
+    - DELE
+    - RMD
+    - RNFR
+    - RNTO
     """
     class Command():
         """
@@ -39,7 +43,6 @@ class FtpClient:
         LIST = 'LIST'
         USER = 'USER'
         PASS = 'PASS'
-        EPRT = 'EPRT'
         EPSV = 'EPSV'
         QUIT = 'QUIT'
         RETR = 'RETR'
@@ -245,6 +248,12 @@ class FtpClient:
         self._log(f'LIST data:\n{data.decode("utf-8")}')
 
         return data
+
+    def ls(self, filename=None):
+        """
+        An alias for list().
+        """
+        return self.list(filename)
 
     def pwd(self):
         """
