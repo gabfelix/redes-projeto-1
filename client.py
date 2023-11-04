@@ -332,6 +332,19 @@ class FtpClient:
         """
         self.rmd(directory)
 
+    def rename(self, old_filename, new_filename):
+        """
+        Send RNFR and RNTO commands to host.
+        """
+        self._is_connected()
+        self._is_authenticated()
+
+        self._send_command(FtpClient.Command.RNFR, old_filename)
+        data = self._receive_command_data()
+        if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
+            self._send_command(FtpClient.Command.RNTO, new_filename)
+            _ = self._receive_command_data()
+
     def _reset_data_socket(self):
         self._data_socket = socket.socket()
         self._data_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
@@ -495,4 +508,7 @@ client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client.list()
+client.rename('TestUpload.kml', 'TestUpload2.kml')
+client.list()
+client.rename('TestUpload2.kml', 'TestUpload.kml')
 client.disconnect()
