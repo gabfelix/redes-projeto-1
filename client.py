@@ -64,7 +64,6 @@ class FtpClient:
 
     class UnknownHost(Exception):
         """Exception raised when a host is not found."""
-
         def __init__(self):
             self.message = "Host not found"
 
@@ -79,7 +78,6 @@ class FtpClient:
 
         def __init__(self):
             self.message = "Not connected"
-
         def __str__(self):
             return repr(self.message)
 
@@ -87,7 +85,6 @@ class FtpClient:
         """
         Exception raised when a user is not authenticated.
         """
-
         def __init__(self):
             self.message = "Not authenticated"
 
@@ -96,7 +93,6 @@ class FtpClient:
 
     class ConnectionRefused(Exception):
         """Exception raised when a connection is refused by the server."""
-
         def __init__(self):
             self.message = "Connection refused"
 
@@ -105,9 +101,16 @@ class FtpClient:
 
     class SocketTimeout(Exception):
         """Exception raised when a socket times out."""
-
         def __init__(self):
             self.message = "A socket has timed out"
+
+        def __str__(self):
+            return repr(self.message)
+
+    class LocalIOError(Exception):
+        """Exception raised when a local IO error occurs."""
+        def __init__(self):
+            self.message = "A local IO error has occurred"
 
         def __str__(self):
             return repr(self.message)
@@ -148,6 +151,9 @@ class FtpClient:
         self._is_connected()
         self._is_authenticated()
 
+        if self._data_socket_is_connected:
+            return
+
         self._send_command(FtpClient.Command.EPSV)
         data = self._receive_command_data()
         self._data_port = int(data.decode("utf-8").split("|")[3])
@@ -165,11 +171,16 @@ class FtpClient:
           f'{Fore.MAGENTA}{self._data_port}{Style.RESET_ALL}')
         self._data_socket_is_connected = True
 
+    def _close_data_connection(self):
+        self._data_socket.close()
+        self._data_socket_is_connected = False
+        self._data_port = None
+
     def _read_from_data_connection(self):
-        total_data = ''
+        total_data = b''
         while True:
             data = self._data_socket.recv(FtpClient.SOCKET_RCV_BYTES)
-            total_data += data.decode("utf-8")
+            total_data += data
             if not data:
                 break
         # self._data_socket.close()
@@ -193,6 +204,8 @@ class FtpClient:
         self._is_connected()
         self._is_authenticated()
 
+        self._open_data_connection()
+
         if filename is not None:
             self._send_command(FtpClient.Command.LIST, filename)
         else:
@@ -201,8 +214,10 @@ class FtpClient:
         data = self._receive_command_data()
 
         if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
-            list_data = self._read_from_data_connection().replace('\\r\\n', '\n')
+            list_data = self._read_from_data_connection().decode("utf-8").replace('\\r\\n', '\n')
             data += list_data.encode() + self._receive_command_data()
+
+        self._close_data_connection()
 
         return data
 
@@ -250,6 +265,8 @@ class FtpClient:
         """
 
         self._is_connected()
+        if self._is_authenticated():
+            self.logout()
         self._send_command(FtpClient.Command.QUIT)
         data = self._receive_command_data()
         self._reset_sockets()
@@ -291,6 +308,27 @@ class FtpClient:
         self._log(f'logging out {Fore.YELLOW}{self.user}{Style.RESET_ALL}')
         self.user = None
 
+    def retrieve(self, filename, local_filename):
+        self._is_connected()
+        self._is_authenticated()
+
+        self._open_data_connection()
+
+        self._send_command(FtpClient.Command.RETR, filename)
+        data = self._receive_command_data()
+
+        if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
+            file_data = bytearray(self._read_from_data_connection())
+            try:
+                # TODO: We must check that a sent file is binary or text,
+                # and open the file in the appropriate mode.
+                with open(local_filename, 'wb') as f:
+                    f.write(file_data)
+            except IOError as e:
+                raise FtpClient.LocalIOError from e
+
+        self._close_data_connection()
+
     def _send_command(self, command: str, *args: str):
         for arg in args:
             command += f' {arg}'
@@ -315,11 +353,10 @@ class FtpClient:
         if self.user is None:
             raise FtpClient.NotAuthenticated
 
-
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
-client._open_data_connection()
 client.list()
-client.logout()
+client._reset_data_socket()
+client.retrieve('test.zip', 'testfile.zip')
 client.disconnect()
