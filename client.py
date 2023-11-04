@@ -11,6 +11,7 @@ The client uses the colorama library to print debug messages in color.
 
 import socket
 import errno
+from contextlib import contextmanager
 from colorama import Fore, Style
 
 
@@ -64,6 +65,7 @@ class FtpClient:
 
     class UnknownHost(Exception):
         """Exception raised when a host is not found."""
+
         def __init__(self):
             self.message = "Host not found"
 
@@ -78,6 +80,7 @@ class FtpClient:
 
         def __init__(self):
             self.message = "Not connected"
+
         def __str__(self):
             return repr(self.message)
 
@@ -85,6 +88,7 @@ class FtpClient:
         """
         Exception raised when a user is not authenticated.
         """
+
         def __init__(self):
             self.message = "Not authenticated"
 
@@ -93,6 +97,7 @@ class FtpClient:
 
     class ConnectionRefused(Exception):
         """Exception raised when a connection is refused by the server."""
+
         def __init__(self):
             self.message = "Connection refused"
 
@@ -101,6 +106,7 @@ class FtpClient:
 
     class SocketTimeout(Exception):
         """Exception raised when a socket times out."""
+
         def __init__(self):
             self.message = "A socket has timed out"
 
@@ -109,6 +115,7 @@ class FtpClient:
 
     class LocalIOError(Exception):
         """Exception raised when a local IO error occurs."""
+
         def __init__(self):
             self.message = "A local IO error has occurred"
 
@@ -167,14 +174,27 @@ class FtpClient:
             if e.errno == errno.ECONNREFUSED:
                 raise FtpClient.ConnectionRefused from e
 
-        self._log(f'passive connection established at {Fore.CYAN}{self.host}{Style.RESET_ALL}:'
-          f'{Fore.MAGENTA}{self._data_port}{Style.RESET_ALL}')
+        self._log(f'passive connection {Fore.GREEN}opened{Style.RESET_ALL} at '
+                  f'{Fore.CYAN}{self.host}{Style.RESET_ALL}:'
+                  f'{Fore.MAGENTA}{self._data_port}{Style.RESET_ALL}')
         self._data_socket_is_connected = True
 
     def _close_data_connection(self):
         self._data_socket.close()
         self._data_socket_is_connected = False
+        self._reset_data_socket()
         self._data_port = None
+        self._log(
+            f'passive connection {Fore.RED}closed{Style.RESET_ALL}')
+
+    @contextmanager
+    def _data_connection(self):
+        """
+        A context manager for opening and closing a data connection.
+        """
+        self._open_data_connection()
+        yield
+        self._close_data_connection()
 
     def _read_from_data_connection(self):
         total_data = b''
@@ -204,20 +224,20 @@ class FtpClient:
         self._is_connected()
         self._is_authenticated()
 
-        self._open_data_connection()
+        with self._data_connection():
+            if filename is not None:
+                self._send_command(FtpClient.Command.LIST, filename)
+            else:
+                self._send_command(FtpClient.Command.LIST)
 
-        if filename is not None:
-            self._send_command(FtpClient.Command.LIST, filename)
-        else:
-            self._send_command(FtpClient.Command.LIST)
+            data = self._receive_command_data()
 
-        data = self._receive_command_data()
+            if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
+                list_data = self._read_from_data_connection().decode(
+                    "utf-8").replace('\\r\\n', '\n')
+                data += list_data.encode() + self._receive_command_data()
 
-        if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
-            list_data = self._read_from_data_connection().decode("utf-8").replace('\\r\\n', '\n')
-            data += list_data.encode() + self._receive_command_data()
-
-        self._close_data_connection()
+        self._log(f'LIST data:\n{data.decode("utf-8")}')
 
         return data
 
@@ -308,26 +328,29 @@ class FtpClient:
         self._log(f'logging out {Fore.YELLOW}{self.user}{Style.RESET_ALL}')
         self.user = None
 
-    def retrieve(self, filename, local_filename):
+    def retrieve(self, filename, local_filename=None):
+        """
+        Retrieves the specified file from the server and saves it locally.
+        """
         self._is_connected()
         self._is_authenticated()
 
-        self._open_data_connection()
+        if local_filename is None:
+            local_filename = filename
 
-        self._send_command(FtpClient.Command.RETR, filename)
-        data = self._receive_command_data()
+        with self._data_connection():
+            self._send_command(FtpClient.Command.RETR, filename)
+            data = self._receive_command_data()
 
-        if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
-            file_data = bytearray(self._read_from_data_connection())
-            try:
-                # TODO: We must check that a sent file is binary or text,
-                # and open the file in the appropriate mode.
-                with open(local_filename, 'wb') as f:
-                    f.write(file_data)
-            except IOError as e:
-                raise FtpClient.LocalIOError from e
-
-        self._close_data_connection()
+            if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
+                file_data = bytearray(self._read_from_data_connection())
+                try:
+                    # TODO: We must check that a sent file is binary or text,
+                    # and open the file in the appropriate mode.
+                    with open(local_filename, 'wb') as f:
+                        f.write(file_data)
+                except IOError as e:
+                    raise FtpClient.LocalIOError from e
 
     def _send_command(self, command: str, *args: str):
         for arg in args:
@@ -353,10 +376,10 @@ class FtpClient:
         if self.user is None:
             raise FtpClient.NotAuthenticated
 
+
 client = FtpClient(debug=True)
 client.connect(host='ftp.dlptest.com')
 client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
 client.list()
-client._reset_data_socket()
-client.retrieve('test.zip', 'testfile.zip')
+client.retrieve('TestUpload.kml')
 client.disconnect()
