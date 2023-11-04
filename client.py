@@ -125,6 +125,15 @@ class FtpClient:
         def __str__(self):
             return repr(self.message)
 
+    class ClosedDataConnection(Exception):
+        """Exception raised when a data connection is closed during or just before a transfer."""
+
+        def __init__(self):
+            self.message = "Data connection closed"
+
+        def __str__(self):
+            return repr(self.message)
+
     PORT = 21
     SOCKET_TIMEOUT = 5  # in seconds
     SOCKET_RCV_BYTES = 4096
@@ -210,7 +219,8 @@ class FtpClient:
         return total_data
 
     def _write_to_data_connection(self, data):
-        # TODO: Check if data connection is opened
+        if not self._data_socket_is_connected:
+            raise FtpClient.ClosedDataConnection
         self._log(f'sending data - {data}')
         self._data_socket.sendall(data)
         self._data_socket.close()
@@ -376,7 +386,6 @@ class FtpClient:
 
         if self.host is not None:
             self._reset_sockets()
-        # FIXME: Handle errors correctly
         try:
             self._command_socket.connect((host, FtpClient.PORT))
             self.host = host
@@ -458,8 +467,6 @@ class FtpClient:
             if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
                 file_data = bytearray(self._read_from_data_connection())
                 try:
-                    # TODO: We must check that a sent file is binary or text,
-                    # and open the file in the appropriate mode.
                     with open(local_filename, 'wb') as f:
                         f.write(file_data)
                 except IOError as e:
