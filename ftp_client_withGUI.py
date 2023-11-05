@@ -568,7 +568,7 @@ class FTPClientGUI(QMainWindow):
         self.connect_button.setStyleSheet(button_style)
         layout.addWidget(self.connect_button)
 
-        self.login_button = QPushButton("Logar")
+        self.login_button = QPushButton("Entrar")
         self.login_button.clicked.connect(self.handle_login)
         self.login_button.setStyleSheet(button_style)
         layout.addWidget(self.login_button)
