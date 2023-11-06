@@ -487,16 +487,20 @@ class FtpClient:
         if filename is None:
             filename = local_filename
 
+        data = b''
+
         with self._data_connection():
             try:
                 with open(local_filename, 'rb') as local_file:
                     file_data = bytearray(local_file.read())
                     self._send_command(FtpClient.Command.STOR, filename)
-                    _ = self._receive_command_data()
+                    data = self._receive_command_data()
                     self._write_to_data_connection(file_data)
-                    _ = self._receive_command_data()
+                    data += self._receive_command_data()
             except IOError as e:
                 raise FtpClient.LocalIOError from e
+
+        return data
 
     def _send_command(self, command: str, *args: str):
         for arg in args:

@@ -111,19 +111,25 @@ class FTPClientGUI(QMainWindow):
         thread.start()
 
     def handle_store(self):
-        directory = self.directory_input.text()
+        #directory = self.directory_input.text()
         filename = self.filename_input.text()
 
-        class StoreThread(QThread):
-            def run(self):
-                response = self.client.store(filename, directory)
-                self.message_display.append(response.decode("utf-8"))
-
-        thread = StoreThread(self)
+        thread = StoreThread(self, filename)
+        thread.setParent(self)
         thread.start()
 
     def handle_clear(self):
         self.message_display.clear()
+
+class StoreThread(QThread):
+    def __init__(self, window: FTPClientGUI, filename: str):
+        super().__init__()
+        self._window = window
+        self._filename = filename
+
+    def run(self):
+        response = self._window.client.store(self._filename)
+        self._window.message_display.append(response.decode("utf-8"))
 
 class RetrieveThread(QThread):
     def __init__(self, window: FTPClientGUI, filename: str):
