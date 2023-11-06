@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import PySide6.QtGui
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLineEdit,
                                QMainWindow, QPushButton, QTextEdit,
@@ -7,6 +8,36 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLineEdit,
 
 from client import FtpClient
 
+
+class HorizontalForm(QWidget):
+    layout : QLineEdit
+
+    def __init__(self, label_text : str | None = None, placeholder_text: str | None = None, is_password=False):
+        super().__init__()
+
+        self.layout = QHBoxLayout()
+
+        if label_text is None or len(label_text) > 0:
+            self.label = QLabel(label_text)
+            self.layout.addWidget(self.label)
+
+        self.placeholder_text = ''
+
+        self.textbox = QLineEdit()
+        if is_password:
+            self.textbox.setEchoMode(QLineEdit.Password)
+        if placeholder_text is not None and len(placeholder_text) > 0:
+            self.textbox.setPlaceholderText(placeholder_text)
+            self.placeholder_text = placeholder_text
+        self.layout.addWidget(self.textbox)
+
+    def text(self):
+        if len(self.textbox.text()) == 0:
+            return self.placeholder_text
+        return self.textbox.text()
+
+    def set_text(self, to : str):
+        return self.textbox.setText(to)
 
 class FTPClientGUI(QMainWindow):
     def __init__(self, debug: bool = False):
@@ -25,6 +56,24 @@ class FTPClientGUI(QMainWindow):
 
         layout = QVBoxLayout()
 
+        placeholder_hostname = None
+        if self._debug:
+            placeholder_hostname = "ftp.dlptest.com"
+        self.hostname_form = HorizontalForm("Hostname:", placeholder_text=placeholder_hostname)
+        layout.addLayout(self.hostname_form.layout)
+
+        placeholder_user = None
+        if self._debug:
+            placeholder_user = "dlpuser"
+        self.user_form = HorizontalForm("Usuário:", placeholder_text=placeholder_user)
+        layout.addLayout(self.user_form.layout)
+
+        placeholder_password = None
+        if self._debug:
+            placeholder_password = "rNrKYTX9g7z3RgJRmxWuGHbeu"
+        self.password_form = HorizontalForm("Senha:", placeholder_text=placeholder_password, is_password=True)
+        layout.addLayout(self.password_form.layout)
+
         button_style = "QPushButton { background-color: #4CAF50; color: white; border: none; padding: 10px; }" \
                        "QPushButton:hover { background-color: #45a049; }"
 
@@ -42,13 +91,6 @@ class FTPClientGUI(QMainWindow):
         self.list_button.clicked.connect(self.handle_list)
         self.list_button.setStyleSheet(button_style)
         layout.addWidget(self.list_button)
-
-        directory_layout = QHBoxLayout()
-        self.directory_label = QLabel("Diretório:")
-        self.directory_input = QLineEdit()
-        directory_layout.addWidget(self.directory_label)
-        directory_layout.addWidget(self.directory_input)
-        layout.addLayout(directory_layout)
 
         filename_layout = QHBoxLayout()
         self.filename_label = QLabel("Arquivo:")
@@ -85,17 +127,16 @@ class FTPClientGUI(QMainWindow):
 
         self.client = FtpClient(self._debug)
 
-        # FIXME: This will change after removing server hardcode
-        if self._debug:
-            self.connect_button.click()
-            self.login_button.click()
-
     def handle_connect(self):
-        response = self.client.connect(host='ftp.dlptest.com')
+        response = self.client.connect(self.hostname_form.text())
         self.message_display.append(response.decode("utf-8"))
 
     def handle_login(self):
-        response = self.client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
+        user = self.user_form.text()
+        password = self.password_form.text()
+        if len(user) == 0 or len(password) == 0:
+            return
+        response = self.client.login(user, password)
         self.message_display.append(response.decode("utf-8"))
 
     def handle_list(self):
@@ -103,7 +144,6 @@ class FTPClientGUI(QMainWindow):
         self.message_display.append(response.decode("utf-8"))
 
     def handle_retrieve(self):
-        #directory = self.directory_input.text()
         filename = self.filename_input.text()
 
         thread = RetrieveThread(self, filename)
@@ -111,7 +151,6 @@ class FTPClientGUI(QMainWindow):
         thread.start()
 
     def handle_store(self):
-        #directory = self.directory_input.text()
         filename = self.filename_input.text()
 
         thread = StoreThread(self, filename)
@@ -120,6 +159,9 @@ class FTPClientGUI(QMainWindow):
 
     def handle_clear(self):
         self.message_display.clear()
+
+    def closeEvent(self, _):
+        self.client.disconnect()
 
 class StoreThread(QThread):
     def __init__(self, window: FTPClientGUI, filename: str):
