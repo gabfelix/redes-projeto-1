@@ -132,8 +132,8 @@ class RetrieveThread(QThread):
         self._filename = filename
 
     def run(self):
-        response = window.client.retrieve(self._filename)
-        window.message_display.append(response.decode("utf-8"))
+        response = self._window.client.retrieve(self._filename)
+        self._window.message_display.append(response.decode("utf-8"))
 
 if __name__ == "__main__":
     app = QApplication([])
