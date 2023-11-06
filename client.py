@@ -9,9 +9,10 @@ It also defines several custom exceptions that can be raised during the executio
 The client uses the colorama library to print debug messages in color.
 """
 
-import socket
 import errno
+import socket
 from contextlib import contextmanager
+
 from colorama import Fore, Style
 
 
@@ -466,11 +467,13 @@ class FtpClient:
 
             if not data.startswith(FtpClient.Status.FILE_NOT_FOUND):
                 file_data = bytearray(self._read_from_data_connection())
+                data += self._receive_command_data()
                 try:
                     with open(local_filename, 'wb') as f:
                         f.write(file_data)
                 except IOError as e:
                     raise FtpClient.LocalIOError from e
+        return data
 
     def store(self, local_filename, filename=None):
         """

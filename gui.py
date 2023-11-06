@@ -14,7 +14,10 @@ class FTPClientGUI(QMainWindow):
 
         self._debug = debug
 
-        self.setWindowTitle("FTP Client")
+        window_title = "FTP Client"
+        if self._debug:
+            window_title += " (Debug)"
+        self.setWindowTitle(window_title)
         self.setGeometry(100, 100, 600, 400)  # Set the initial window size
 
         central_widget = QWidget()
@@ -74,6 +77,8 @@ class FTPClientGUI(QMainWindow):
         layout.addWidget(self.clear_button)
 
         self.message_display = QTextEdit()
+        self.message_display.setReadOnly(True)
+
         layout.addWidget(self.message_display)
 
         central_widget.setLayout(layout)
@@ -101,7 +106,8 @@ class FTPClientGUI(QMainWindow):
         #directory = self.directory_input.text()
         filename = self.filename_input.text()
 
-        thread = FTPClientGUI.RetrieveThread(self.client, filename)
+        thread = RetrieveThread(self, filename)
+        thread.setParent(self)
         thread.start()
 
     def handle_store(self):
@@ -118,6 +124,16 @@ class FTPClientGUI(QMainWindow):
 
     def handle_clear(self):
         self.message_display.clear()
+
+class RetrieveThread(QThread):
+    def __init__(self, window: FTPClientGUI, filename: str):
+        super().__init__()
+        self._window = window
+        self._filename = filename
+
+    def run(self):
+        response = window.client.retrieve(self._filename)
+        window.message_display.append(response.decode("utf-8"))
 
 if __name__ == "__main__":
     app = QApplication([])
