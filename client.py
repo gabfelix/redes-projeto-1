@@ -168,8 +168,8 @@ class FtpClient:
         self._command_socket.settimeout(FtpClient.SOCKET_TIMEOUT)
 
     def _open_data_connection(self):
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         if self._data_socket_is_connected:
             return
@@ -240,8 +240,8 @@ class FtpClient:
             in the specified directory (if any).
         """
 
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         with self._data_connection():
             if filename is not None:
@@ -270,8 +270,8 @@ class FtpClient:
         """
         Sends a PWD command to the server to retrieve the current directory.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         with self._data_connection():
             self._send_command(FtpClient.Command.PWD)
@@ -284,8 +284,8 @@ class FtpClient:
         """
         Send CWD command to host.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         self._send_command(FtpClient.Command.CWD, directory)
         data = self._receive_command_data()
@@ -296,8 +296,8 @@ class FtpClient:
         """
         Send CDUP command to host.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         self._send_command(FtpClient.Command.CDUP)
         data = self._receive_command_data()
@@ -308,8 +308,8 @@ class FtpClient:
         """
         Send MKD command to host.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         self._send_command(FtpClient.Command.MKD, directory)
         data = self._receive_command_data()
@@ -320,8 +320,8 @@ class FtpClient:
         """
         Send DELE command to host.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         self._send_command(FtpClient.Command.DELE, filename)
         data = self._receive_command_data()
@@ -338,8 +338,8 @@ class FtpClient:
         """
         Send RMD command to host.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         self._send_command(FtpClient.Command.RMD, directory)
         data = self._receive_command_data()
@@ -356,8 +356,8 @@ class FtpClient:
         """
         Send RNFR and RNTO commands to host.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         self._send_command(FtpClient.Command.RNFR, old_filename)
         data = self._receive_command_data()
@@ -407,8 +407,8 @@ class FtpClient:
             The response data received from the server after sending the QUIT command.
         """
 
-        self._is_connected()
-        if self._is_authenticated():
+        self.ensure_connection()
+        if self.ensure_login():
             self.logout()
         self._send_command(FtpClient.Command.QUIT)
         data = self._receive_command_data()
@@ -416,7 +416,7 @@ class FtpClient:
 
         return data
 
-    def login(self, user, password):
+    def login(self, user: str, password: str):
         """
         Logs in to the FTP server with the given username and password.
 
@@ -427,7 +427,7 @@ class FtpClient:
         Returns:
             str: The response message from the server after attempting to login.
         """
-        self._is_connected()
+        self.ensure_connection()
         self._send_command(FtpClient.Command.USER, user)
         _ = self._receive_command_data()
         self._send_command(FtpClient.Command.PASS, password)
@@ -446,8 +446,8 @@ class FtpClient:
         Raises an exception if the client is not connected or authenticated.
         """
 
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
         self._log(f'logging out {Fore.YELLOW}{self.user}{Style.RESET_ALL}')
         self.user = None
 
@@ -455,8 +455,8 @@ class FtpClient:
         """
         Retrieves the specified file from the server and saves it locally.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         if local_filename is None:
             local_filename = filename
@@ -481,8 +481,8 @@ class FtpClient:
 
         Note that local_filename and filename's order is reversed from the RETR command.
         """
-        self._is_connected()
-        self._is_authenticated()
+        self.ensure_connection()
+        self.ensure_login()
 
         if filename is None:
             filename = local_filename
@@ -518,10 +518,10 @@ class FtpClient:
             f'received command data - {Fore.BLUE}{data}{Style.RESET_ALL}')
         return data
 
-    def _is_connected(self):
+    def ensure_connection(self):
         if self.host is None:
             raise FtpClient.NotConnected
 
-    def _is_authenticated(self):
+    def ensure_login(self):
         if self.user is None:
             raise FtpClient.NotAuthenticated
