@@ -9,8 +9,10 @@ from client import FtpClient
 
 
 class FTPClientGUI(QMainWindow):
-    def __init__(self):
+    def __init__(self, debug: bool = False):
         super().__init__()
+
+        self._debug = debug
 
         self.setWindowTitle("FTP Client")
         self.setGeometry(100, 100, 600, 400)  # Set the initial window size
@@ -76,8 +78,12 @@ class FTPClientGUI(QMainWindow):
 
         central_widget.setLayout(layout)
 
-        self.client = FtpClient(debug=True)
+        self.client = FtpClient(self._debug)
 
+        # FIXME: This will change after removing server hardcode
+        if self._debug:
+            self.connect_button.click()
+            self.login_button.click()
 
     def handle_connect(self):
         response = self.client.connect(host='ftp.dlptest.com')
@@ -92,15 +98,10 @@ class FTPClientGUI(QMainWindow):
         self.message_display.append(response.decode("utf-8"))
 
     def handle_retrieve(self):
-        directory = self.directory_input.text()
+        #directory = self.directory_input.text()
         filename = self.filename_input.text()
 
-        class RetrieveThread(QThread):
-            def run(self):
-                response = self.client.retrieve(filename, directory)
-                self.message_display.append(response.decode("utf-8"))
-
-        thread = RetrieveThread(self)
+        thread = FTPClientGUI.RetrieveThread(self.client, filename)
         thread.start()
 
     def handle_store(self):
@@ -124,6 +125,6 @@ if __name__ == "__main__":
                       "QLabel{color: #333; font-size: 16px;}"  # Style for labels
                       "QLineEdit{padding: 8px;}"  # Style for line edits
                       "QTextEdit{padding: 8px;}")
-    window = FTPClientGUI()
+    window = FTPClientGUI(debug=True)
     window.show()
     app.exec()
