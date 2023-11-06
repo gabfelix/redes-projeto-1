@@ -518,13 +518,3 @@ class FtpClient:
     def _is_authenticated(self):
         if self.user is None:
             raise FtpClient.NotAuthenticated
-
-
-client = FtpClient(debug=True)
-client.connect(host='ftp.dlptest.com')
-client.login(user="dlpuser", password="rNrKYTX9g7z3RgJRmxWuGHbeu")
-client.list()
-client.rename('TestUpload.kml', 'TestUpload2.kml')
-client.list()
-client.rename('TestUpload2.kml', 'TestUpload.kml')
-client.disconnect()
